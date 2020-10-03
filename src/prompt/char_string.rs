@@ -1,6 +1,8 @@
 // TODO: Support tabs and other variable width characters
 // TODO: Support buffers with line breaks (https://en.wikipedia.org/wiki/Newline#Unicode)
-/// uhh…
+/// Wrapper for a string of chars. Primarily used internally, but the
+/// [`From`] impls allow you to pass ordinary strings to
+/// [`Prompt::read_line_extra`](super::Prompt::read_line_extra) as well.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct CharString(Vec<char>);
 
