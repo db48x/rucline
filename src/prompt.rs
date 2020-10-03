@@ -49,7 +49,8 @@ mod navigation;
 mod writer;
 
 use buffer::Buffer;
-use char_string::{CharString, CharStringView};
+pub use char_string::CharString;
+use char_string::CharStringView;
 use context::ContextImpl;
 use writer::Writer;
 
@@ -190,11 +191,38 @@ impl<'o, 'c, 's> Prompt<'o, 'c, 's> {
     /// [`Prompt`]: struct.Prompt.html
     /// [`ErrorKind`]: ../enum.ErrorKind.html
     pub fn read_line(&self) -> Result<Option<String>, crate::ErrorKind> {
+        self.read_line_extra::<&[char]>(None, None)
+    }
+
+    /// Blocks until an input is committed by the user.
+    ///
+    ///
+    /// Analogous to `std::io::stdin().read_line()`, however providing all the customization
+    /// configured in the [`Prompt`].
+    ///
+    /// # Arguments
+    ///
+    /// * [`initial_buffer`] - Initial contents of the buffer; this text appears as if the user had typed it.
+    /// * [`suffix`] - Text to display after the prompt
+    ///
+    /// # Return
+    ///
+    /// * `Option<String>` - A string containing the user input, or `None` if the user has
+    /// cancelled the input.
+    ///
+    /// # Errors
+    /// * [`ErrorKind`] - If an error occurred while reading the user input.
+    ///
+    /// [`Prompt`]: struct.Prompt.html
+    /// [`ErrorKind`]: ../enum.ErrorKind.html
+    pub fn read_line_extra<S: Into<CharString>>(&self, initial_buffer: Option<S>, suffix: Option<S>) -> Result<Option<String>, crate::ErrorKind> {
         let mut context = ContextImpl::new(
             self.erase_after_read,
             self.text.as_ref(),
             self.completer,
             self.suggester,
+            initial_buffer.map(|s| s.into()),
+            suffix.map(|s| s.into())
         )?;
 
         context.print()?;

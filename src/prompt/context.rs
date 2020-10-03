@@ -7,6 +7,7 @@ use crate::Context;
 pub(super) struct ContextImpl<'c, 's> {
     writer: Writer,
     buffer: Buffer,
+    suffix: Option<CharString>,
     completer: Option<&'c dyn Completer>,
     completion: Option<CharStringView<'c>>,
     suggester: Option<&'s dyn Suggester>,
@@ -31,10 +32,13 @@ impl<'c, 's> ContextImpl<'c, 's> {
         prompt: Option<&CharString>,
         completer: Option<&'c dyn Completer>,
         suggester: Option<&'s dyn Suggester>,
+        initial_buffer: Option<CharString>,
+        suffix: Option<CharString>,
     ) -> Result<Self, crate::ErrorKind> {
         Ok(Self {
             writer: Writer::new(erase_on_drop, prompt)?,
-            buffer: Buffer::new(),
+            buffer: Buffer::new(initial_buffer),
+            suffix,
             completer,
             completion: None,
             suggester,
@@ -48,21 +52,21 @@ impl<'c, 's> ContextImpl<'c, 's> {
     }
 
     pub(super) fn print(&mut self) -> Result<(), crate::ErrorKind> {
-        self.writer.print(&self.buffer, self.completion)
+        self.writer.print(&self.buffer, self.completion, &self.suffix)
     }
 
     pub(super) fn write(&mut self, c: char) -> Result<(), crate::ErrorKind> {
         self.try_take_suggestion();
         self.buffer.write(c);
         self.update_completion();
-        self.writer.print(&self.buffer, self.completion)
+        self.print()
     }
 
     pub(super) fn delete(&mut self, scope: Scope) -> Result<(), crate::ErrorKind> {
         self.try_take_suggestion();
         self.buffer.delete(scope);
         self.update_completion();
-        self.writer.print(&self.buffer, self.completion)
+        self.print()
     }
 
     pub(super) fn move_cursor(
@@ -72,7 +76,7 @@ impl<'c, 's> ContextImpl<'c, 's> {
     ) -> Result<(), crate::ErrorKind> {
         self.try_take_suggestion();
         self.buffer.move_cursor(range, direction);
-        self.writer.print(&self.buffer, self.completion)
+        self.print()
     }
 
     pub(super) fn complete(&mut self, range: Range) -> Result<(), crate::ErrorKind> {
@@ -82,18 +86,18 @@ impl<'c, 's> ContextImpl<'c, 's> {
                 Range::Line => {
                     self.buffer.write_str(completion);
                     self.update_completion();
-                    self.writer.print(&self.buffer, self.completion)
+                    self.print()
                 }
                 Range::Word => {
                     let index = navigation::next_word(0, &completion);
                     self.buffer.write_str(&completion[0..index]);
                     self.update_completion();
-                    self.writer.print(&self.buffer, self.completion)
+                    self.print()
                 }
                 Range::Single => {
                     self.buffer.write(completion[0]);
                     self.update_completion();
-                    self.writer.print(&self.buffer, self.completion)
+                    self.print()
                 }
             }
         } else {
@@ -129,7 +133,7 @@ impl<'c, 's> ContextImpl<'c, 's> {
             }
         }
 
-        self.writer.print(&self.buffer, self.completion)
+        self.print()
     }
 
     pub(super) fn is_suggesting(&self) -> bool {
@@ -138,7 +142,7 @@ impl<'c, 's> ContextImpl<'c, 's> {
 
     pub(super) fn cancel_suggestion(&mut self) -> Result<(), crate::ErrorKind> {
         self.suggestions = None;
-        self.writer.print(&self.buffer, self.completion)
+        self.print()
     }
 
     fn try_take_suggestion(&mut self) {

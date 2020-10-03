@@ -36,6 +36,7 @@ impl Writer {
         &mut self,
         buffer: &Buffer,
         completion: Option<CharStringView<'_>>,
+        suffix: &Option<CharString>,
     ) -> Result<(), crate::ErrorKind> {
         use std::io::Write;
         let mut stdout = std::io::stdout();
@@ -53,7 +54,16 @@ impl Writer {
                 &mut stdout,
                 crossterm::style::PrintStyledContent(crossterm::style::style(completion).blue())
             )?;
+            if let Some(suffix) = suffix {
+                crossterm::queue!(&mut stdout, crossterm::style::Print(&suffix))?;
+                rewind_cursor(&mut stdout, suffix.len())?;
+            }
             rewind_cursor(&mut stdout, completion.len())?;
+        } else {
+            if let Some(suffix) = suffix {
+                crossterm::queue!(&mut stdout, crossterm::style::Print(&suffix))?;
+                rewind_cursor(&mut stdout, suffix.len())?;
+            }
         }
 
         rewind_cursor(&mut stdout, self.cursor_offset)?;

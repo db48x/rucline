@@ -1,4 +1,5 @@
 #![deny(warnings, missing_docs, clippy::pedantic, clippy::all)]
+#![cfg_attr(doc, allow(warnings))]
 #![warn(rust_2018_idioms)]
 
 //! Rucline, the Rust CLI Line reader, or simply "recline", is a cross-platform, UTF-8 compatible

@@ -23,8 +23,13 @@ impl Default for Buffer {
 
 impl Buffer {
     /// Creates an empty buffer.
-    pub(super) fn new() -> Self {
-        Buffer::default()
+    pub(super) fn new(initial_buffer: Option<CharString>) -> Self {
+        if let Some(b) = initial_buffer {
+            let len = b.len();
+            Buffer { chars: b, cursor: len }
+        } else {
+            Buffer::default()
+        }
     }
 
     /// Returns the current position of the cursor.
