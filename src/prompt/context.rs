@@ -1,4 +1,4 @@
-use super::{Buffer, Completer, Direction, Range, Scope, Suggester, Writer};
+use super::{Buffer, Completer, Direction, Range, Scope, Suggester, Writer, PrintFunc};
 
 use crate::Error;
 
@@ -20,9 +20,9 @@ where
     C: Completer + ?Sized,
     S: Suggester + ?Sized,
 {
-    pub(super) fn new(
+    pub(super) fn new<'a>(
         erase_on_drop: bool,
-        prompt: Option<&str>,
+        prompt: Option<PrintFunc<'a>>,
         buffer: Option<Buffer>,
         completer: Option<&'c C>,
         suggester: Option<&'s S>,

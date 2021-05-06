@@ -1,4 +1,5 @@
 use super::Outcome;
+use super::PrintFunc;
 
 use crate::actions::{Action, Event, Overrider};
 use crate::completion::{Completer, Suggester};
@@ -50,13 +51,13 @@ macro_rules! impl_builder {
             }
         }
 
-        fn completer_fn<'a, F, R>(
+        fn completer_fn<'b, F, R>(
             self,
             closure: F,
-        ) -> WithCompleter<Closure<'a, F, Option<R>>, Self>
+        ) -> WithCompleter<Closure<'b, F, Option<R>>, Self>
         where
             F: Fn(&Buffer) -> Option<R>,
-            R: Into<std::borrow::Cow<'a, str>>,
+            R: Into<std::borrow::Cow<'b, str>>,
         {
             WithCompleter {
                 base: self,
@@ -81,10 +82,10 @@ macro_rules! impl_builder {
             }
         }
 
-        fn suggester_fn<'a, F, R>(self, closure: F) -> WithSuggester<Closure<'a, F, Vec<R>>, Self>
+        fn suggester_fn<'b, F, R>(self, closure: F) -> WithSuggester<Closure<'b, F, Vec<R>>, Self>
         where
             F: Fn(&Buffer) -> Vec<R>,
-            R: Into<std::borrow::Cow<'a, str>>,
+            R: Into<std::borrow::Cow<'b, str>>,
         {
             WithSuggester {
                 base: self,
@@ -314,14 +315,13 @@ pub trait ChainedLineReader {
 /// ```
 ///
 /// [`Builder`]: trait.Builder.html
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Prompt {
-    prompt: Option<String>,
+pub struct Prompt<'a> {
+    prompt: Option<PrintFunc<'a>>,
     buffer: Option<Buffer>,
     erase_after_read: bool,
 }
 
-impl Prompt {
+impl<'a> Prompt<'a> {
     /// Creates a new [`Prompt`] with no prompt text. Equivalent to calling `Prompt::default()`
     ///
     /// [`Prompt`]: struct.Prompt.html
@@ -333,18 +333,37 @@ impl Prompt {
             erase_after_read: false,
         }
     }
+
+    /// Creates a new [`Prompt`] with no prompt text. Equivalent to calling `Prompt::default()`
+    ///
+    /// [`Prompt`]: struct.Prompt.html
+    #[must_use]
+    pub fn new_fn(f: PrintFunc<'a>) -> Self {
+        Self {
+            prompt: Some(f),
+            buffer: None,
+            erase_after_read: false,
+        }
+    }
 }
 
-impl Default for Prompt {
+impl<'a> Default for Prompt<'a> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<S: ToString> std::convert::From<S> for Prompt {
+impl<'a, S: ToString> std::convert::From<S> for Prompt<'a> {
     fn from(s: S) -> Self {
+        let s = s.to_string();
+        let chars_to_erase = unicode_segmentation::UnicodeSegmentation::graphemes(s.as_str(), true).count();
+        let f = move |mut w: Box<dyn std::io::Write>| -> Result<usize, Error> {
+            use std::io::Write;
+            crossterm::queue!(w, crossterm::style::Print(&s))?;
+            Ok(chars_to_erase)
+        };
         Self {
-            prompt: Some(s.to_string()),
+            prompt: Some(Box::new(f)),
             buffer: None,
             erase_after_read: false,
         }
@@ -405,7 +424,7 @@ where
     suggester: &'s S,
 }
 
-impl Builder for Prompt {
+impl<'a> Builder for Prompt<'a> {
     fn buffer(mut self, buffer: Buffer) -> Self {
         self.buffer = Some(buffer);
         self
@@ -420,7 +439,7 @@ impl Builder for Prompt {
 
     fn read_line(self) -> Result<Outcome, Error> {
         super::read_line::<Dummy, Dummy, Dummy>(
-            self.prompt.as_deref(),
+            self.prompt,
             self.buffer,
             self.erase_after_read,
             None,
@@ -514,7 +533,7 @@ where
     }
 }
 
-impl ChainedLineReader for Prompt {
+impl<'a> ChainedLineReader for Prompt<'a> {
     fn chain_read_line<O, C, S>(
         self,
         overrider: Option<&O>,
@@ -527,7 +546,7 @@ impl ChainedLineReader for Prompt {
         S: Suggester + ?Sized,
     {
         super::read_line(
-            self.prompt.as_deref(),
+            self.prompt,
             self.buffer,
             self.erase_after_read,
             overrider,

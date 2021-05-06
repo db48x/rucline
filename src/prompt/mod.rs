@@ -40,8 +40,12 @@ use writer::Writer;
 use crate::actions::{action_for, Action, Direction, Overrider, Range, Scope};
 use crate::completion::{Completer, Suggester};
 use crate::Buffer;
+use crate::Error;
 
 pub use builder::{Builder, Prompt};
+
+/// yea, yea
+pub type PrintFunc<'a> = Box<dyn Fn(Box<dyn std::io::Write>) -> Result<usize, Error> + 'a>;
 
 /// The outcome of [`read_line`], being either accepted or canceled by the user.
 ///
@@ -145,8 +149,8 @@ impl Outcome {
 /// [`Outcome`]: enum.Outcome.html
 /// [`Prompt`]: struct.Prompt.html
 /// [`buffer`]: ../buffer/struct.Buffer.html
-pub fn read_line<O, C, S>(
-    prompt: Option<&str>,
+pub fn read_line<'a, O, C, S>(
+    prompt: Option<PrintFunc<'a>>,
     buffer: Option<Buffer>,
     erase_after_read: bool,
     overrider: Option<&O>,
@@ -160,7 +164,7 @@ where
 {
     let mut context = Context::new(
         erase_after_read,
-        prompt.as_deref(),
+        prompt,
         buffer,
         completer,
         suggester,

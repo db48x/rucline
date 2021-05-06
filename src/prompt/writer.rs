@@ -1,4 +1,5 @@
 use super::Buffer;
+use super::PrintFunc;
 
 use crate::Error;
 
@@ -11,18 +12,18 @@ pub(super) struct Writer {
 }
 
 impl Writer {
-    pub(super) fn new(erase_on_drop: bool, prompt: Option<&str>) -> Result<Self, Error> {
+    pub(super) fn new<'a>(erase_on_drop: bool, prompt: Option<PrintFunc<'a>>) -> Result<Self, Error> {
         crossterm::terminal::enable_raw_mode()?;
-        if let Some(prompt) = prompt {
-            use std::io::Write;
-
-            crossterm::queue!(std::io::stdout(), crossterm::style::Print(prompt))?;
-        }
+        let chars_to_erase = if let Some(prompt) = prompt {
+            //use std::io::Write;
+            //crossterm::queue!(std::io::stdout(), crossterm::style::Print(prompt))?;
+            prompt(Box::new(std::io::stdout()))?
+        } else {
+            0
+        };
 
         let erase_on_drop = if erase_on_drop {
-            prompt
-                .map(|s| unicode_segmentation::UnicodeSegmentation::graphemes(s, true).count())
-                .or(Some(0))
+            Some(chars_to_erase)
         } else {
             None
         };
@@ -133,7 +134,7 @@ fn clear_from(stdout: &mut std::io::Stdout, amount: usize) -> Result<(), Error> 
 
     crossterm::queue!(
         stdout,
-        crossterm::terminal::Clear(crossterm::terminal::ClearType::FromCursorDown),
+        crossterm::terminal::Clear(crossterm::terminal::ClearType::UntilNewLine),
     )
 }
 

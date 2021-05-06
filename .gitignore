@@ -11,3 +11,4 @@ Cargo.lock
 # Testing
 examples/tester.rs
 output
+*~
